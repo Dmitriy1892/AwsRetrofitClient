@@ -102,6 +102,10 @@ internal class AwsSigningV2Interceptor(
                 key.contains(AwsConstants.X_AMZ_KEY_START) ->
                     canonicalHeadersUnsorted.add(key.lowercase() to value.lowercase())
 
+                key == AwsConstants.CONTENT_TEMP_TYPE -> {
+                    // Do nothing because it's a temporary header
+                }
+
                 else -> plainHeaders.add(key to value)
             }
         }
