@@ -15,3 +15,4 @@ dependencyResolutionManagement {
 rootProject.name = "AwsS3V2RetrofitClient"
 include ':app'
 include ':aws-s3-v2-client'
+include ':aws-s3-v4-client'

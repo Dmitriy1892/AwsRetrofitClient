@@ -32,7 +32,7 @@ class AwsRetrofit {
             urlAdditionalInfoPath: String,
             converterFactory: Converter.Factory,
             okHttpClientBuilder: OkHttpClient.Builder,
-            credentialsUpdater: suspend () -> AwsCredentials
+            credentialsUpdater: () -> AwsCredentials
         ): Retrofit {
 
             val credentialsStore = AwsCredentialsStore(credentialsUpdater)

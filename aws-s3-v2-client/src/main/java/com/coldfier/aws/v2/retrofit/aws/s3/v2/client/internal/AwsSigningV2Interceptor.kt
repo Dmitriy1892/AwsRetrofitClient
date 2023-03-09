@@ -103,6 +103,7 @@ internal class AwsSigningV2Interceptor(
                     canonicalHeadersUnsorted.add(key.lowercase() to value.lowercase())
 
                 key == AwsConstants.CONTENT_TEMP_TYPE -> {
+                    plainHeaders.add(AwsConstants.CONTENT_TYPE_HEADER to value)
                     // Do nothing because it's a temporary header
                 }
 
@@ -165,9 +166,7 @@ internal class AwsSigningV2Interceptor(
 
         val stringToSignBuilder = StringBuilder()
 
-        val type = request.header(AwsConstants.CONTENT_TYPE_HEADER)
-            ?: request.header(AwsConstants.CONTENT_TEMP_TYPE)
-            ?: "binary/octet-stream"
+        val type = request.header(AwsConstants.CONTENT_TEMP_TYPE)
 
         stringToSignBuilder
             .appendLine(request.method)
