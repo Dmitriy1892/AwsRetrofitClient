@@ -1,11 +1,7 @@
-package com.coldfier.aws.v2.retrofit.aws.s3.v2.client.internal
+package com.coldfier.aws.s3.internal
 
 import com.coldfier.aws.s3.core.AwsHeader
-import com.coldfier.aws.s3.internal.*
 import com.coldfier.aws.s3.internal.date.getGmt0Date
-import com.coldfier.aws.s3.internal.date.toRfc2822String
-import com.coldfier.aws.s3.internal.hash.Hash
-import com.coldfier.aws.s3.internal.hash.HmacHash
 import com.coldfier.aws.s3.internal.request.body.bodyBytes
 import kotlinx.coroutines.runBlocking
 import okhttp3.Headers
@@ -14,9 +10,8 @@ import okhttp3.Request
 import okhttp3.Response
 import java.util.Date
 
-internal class AwsSigningV2Interceptor(
-    private val credentialsStore: AwsCredentialsStore,
-    private val endpointPrefix: String
+abstract class AwsInterceptor(
+    private val credentialsStore: AwsCredentialsStore
 ) : Interceptor {
 
     override fun intercept(chain: Interceptor.Chain): Response {
@@ -63,6 +58,24 @@ internal class AwsSigningV2Interceptor(
     }
 
     private fun getSignInfo(request: Request, date: Date): SignInfo {
+        val headersInternal = separateHeaders(request)
+        val convertedHeaders = addInfoToHeaders(headersInternal, request, date)
+        val plainHeaders = convertedHeaders.plainHeaders
+        val xAmzHeaders = convertedHeaders.xAmzHeaders
+
+        val bodyBytes = request.bodyBytes()
+
+        val sortedPlainHeaders = plainHeaders.sortedBy { it.first }
+        val sortedCanonicalHeadersWithoutCopies = normalizeCanonicalHeaders(xAmzHeaders)
+
+        return SignInfo(
+            plainHeaders = sortedPlainHeaders,
+            canonicalHeaders = sortedCanonicalHeadersWithoutCopies,
+            bodyHash = getBodyHash(bodyBytes)
+        )
+    }
+
+    private fun separateHeaders(request: Request): HeadersInternal {
         val plainHeaders = mutableListOf<Pair<String, String>>()
         val xAmzHeaders = mutableListOf<Pair<String, String>>()
 
@@ -86,22 +99,18 @@ internal class AwsSigningV2Interceptor(
         plainHeaders.add(contentTypeHeader)
         plainHeaders.add(AwsConstants.HOST_HEADER to request.url.toUrl().host)
 
-        ////
-        val bodyBytes = request.bodyBytes()
-        val contentMd5Value = Hash.MD5.calculate(bodyBytes).toBase64String()
-        plainHeaders.add(AwsConstants.CONTENT_MD5_HEADER to contentMd5Value)
-
-        plainHeaders.add(AwsConstants.DATE_HEADER to date.toRfc2822String())
-
-        val sortedCanonicalHeadersWithoutCopies =
-            normalizeCanonicalHeaders(xAmzHeaders)
-
-        return SignInfo(
-            plainHeaders = plainHeaders,
-            canonicalHeaders = sortedCanonicalHeadersWithoutCopies,
-            bodyHash = contentMd5Value
-        )
+        return HeadersInternal(plainHeaders, xAmzHeaders)
     }
+
+    protected abstract fun addInfoToHeaders(
+        headersInternal: HeadersInternal,
+        request: Request,
+        date: Date
+    ): HeadersInternal
+
+    protected abstract fun getBodyHash(bodyBytes: ByteArray): String
+
+    protected abstract fun getAuthValue(request: Request, signInfo: SignInfo, date: Date): String
 
     private fun normalizeCanonicalHeaders(
         headers: List<Pair<String, String>>
@@ -131,62 +140,8 @@ internal class AwsSigningV2Interceptor(
         return sortedCanonicalWithoutCopies
     }
 
-    private fun getAuthValue(request: Request, signInfo: SignInfo, date: Date): String {
-        val signature = getSignature(
-            request,
-            signInfo,
-            date
-        )
-
-        return String.format(
-            AwsConstants.AUTH_V2_HEADER_VALUE_FORMAT,
-            credentialsStore.accessKey,
-            signature
-        )
-    }
-
-    private fun getSignature(request: Request, signInfo: SignInfo, date: Date): String {
-        if (request.method == "POST") {
-            val errorMessage = "POST-requests authentication not implemented, use PUT-requests"
-            throw IllegalStateException(errorMessage)
-        }
-
-        val stringToSign = getStringToSign(request, signInfo, date)
-
-        val signature = HmacHash.SHA_1.calculate(
-            credentialsStore.secretKey.toByteArray(),
-            stringToSign.toByteArray()
-        )
-        return signature.toBase64String()
-    }
-
-    private fun getStringToSign(request: Request, signInfo: SignInfo, date: Date): String {
-        val type = request.header(AwsHeader.CONTENT_TYPE)
-
-        val stringToSignBuilder = StringBuilder()
-            .appendLine(request.method)
-            .appendLine(signInfo.bodyHash)
-            .appendLine(type)
-            .appendLine(date.toRfc2822String())
-
-        val canonicalHeaderBuilder = StringBuilder()
-
-        signInfo.canonicalHeaders.forEachIndexed { index, (key, value) ->
-            canonicalHeaderBuilder.append("${key.lowercase()}:${value.lowercase()}")
-
-            val isNotLastIndex = index != signInfo.canonicalHeaders.lastIndex
-            if (isNotLastIndex) canonicalHeaderBuilder.appendLine()
-        }
-
-        val canonicalHeaderString = canonicalHeaderBuilder.toString()
-
-        val resource = request.url.toUrl().path.replace(endpointPrefix, "")
-
-        if (canonicalHeaderString.isNotBlank())
-            stringToSignBuilder.appendLine(canonicalHeaderString)
-
-        stringToSignBuilder.append(resource)
-
-        return stringToSignBuilder.toString()
-    }
+    protected data class HeadersInternal(
+        val plainHeaders: MutableList<Pair<String, String>>,
+        val xAmzHeaders: MutableList<Pair<String, String>>
+    )
 }

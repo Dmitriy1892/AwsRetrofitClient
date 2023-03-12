@@ -1,4 +1,4 @@
-package com.coldfier.aws.v2.retrofit.aws.s3.v2.client
+package com.coldfier.aws.s3.core
 
 data class AwsCredentials(
     val accessKey: String,

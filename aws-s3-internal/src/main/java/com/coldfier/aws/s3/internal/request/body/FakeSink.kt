@@ -1,4 +1,4 @@
-package com.coldfier.aws.v2.retrofit.aws.s3.v2.client.internal
+package com.coldfier.aws.s3.internal.request.body
 
 import okio.*
 import java.io.FileOutputStream
@@ -11,8 +11,6 @@ internal class FakeSink : BufferedSink {
     var byteArray: ByteArray? = null
 
     override val buffer: Buffer = Buffer()
-
-
 
     override fun write(source: ByteArray, offset: Int, byteCount: Int): BufferedSink {
         this.byteArray = source

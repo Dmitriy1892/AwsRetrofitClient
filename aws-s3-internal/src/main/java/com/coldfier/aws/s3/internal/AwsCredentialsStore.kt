@@ -1,15 +1,18 @@
-package com.coldfier.aws.v2.retrofit.aws.s3.v2.client.internal
+package com.coldfier.aws.s3.internal
 
-import com.coldfier.aws.v2.retrofit.aws.s3.v2.client.AwsCredentials
+import com.coldfier.aws.s3.core.AwsCredentials
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-internal class AwsCredentialsStore(private val credentialsUpdater: suspend () -> AwsCredentials) {
+class AwsCredentialsStore(
+    initialCredentials: AwsCredentials,
+    private val credentialsUpdater: suspend () -> AwsCredentials
+) {
 
-    var accessKey: String = ""
+    var accessKey: String = initialCredentials.accessKey
         private set
 
-    var secretKey: String = ""
+    var secretKey: String = initialCredentials.secretKey
         private set
 
     private val mutex = Mutex()
