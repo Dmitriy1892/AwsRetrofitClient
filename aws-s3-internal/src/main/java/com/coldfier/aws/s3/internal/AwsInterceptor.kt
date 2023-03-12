@@ -59,11 +59,13 @@ abstract class AwsInterceptor(
 
     private fun getSignInfo(request: Request, date: Date): SignInfo {
         val headersInternal = separateHeaders(request)
-        val convertedHeaders = addInfoToHeaders(headersInternal, request, date)
-        val plainHeaders = convertedHeaders.plainHeaders
-        val xAmzHeaders = convertedHeaders.xAmzHeaders
 
         val bodyBytes = request.bodyBytes()
+        val bodyHash = getBodyHash(bodyBytes)
+
+        val convertedHeaders = addInfoToHeaders(headersInternal, request, bodyHash, date)
+        val plainHeaders = convertedHeaders.plainHeaders
+        val xAmzHeaders = convertedHeaders.xAmzHeaders
 
         val sortedPlainHeaders = plainHeaders.sortedBy { it.first }
         val sortedCanonicalHeadersWithoutCopies = normalizeCanonicalHeaders(xAmzHeaders)
@@ -71,7 +73,7 @@ abstract class AwsInterceptor(
         return SignInfo(
             plainHeaders = sortedPlainHeaders,
             canonicalHeaders = sortedCanonicalHeadersWithoutCopies,
-            bodyHash = getBodyHash(bodyBytes)
+            bodyHash = bodyHash
         )
     }
 
@@ -79,10 +81,7 @@ abstract class AwsInterceptor(
         val plainHeaders = mutableListOf<Pair<String, String>>()
         val xAmzHeaders = mutableListOf<Pair<String, String>>()
 
-        var contentTypeHeader = Pair(
-            AwsConstants.TRUE_CONTENT_TYPE_HEADER,
-            AwsConstants.DEFAULT_CONTENT_TYPE_VALUE
-        )
+        var contentTypeHeader = Pair(AwsConstants.TRUE_CONTENT_TYPE_HEADER, "")
 
         request.headers.forEach { (key, value) ->
             when {
@@ -96,7 +95,7 @@ abstract class AwsInterceptor(
             }
         }
 
-        plainHeaders.add(contentTypeHeader)
+        if (contentTypeHeader.second.isNotBlank()) plainHeaders.add(contentTypeHeader)
         plainHeaders.add(AwsConstants.HOST_HEADER to request.url.toUrl().host)
 
         return HeadersInternal(plainHeaders, xAmzHeaders)
@@ -105,6 +104,7 @@ abstract class AwsInterceptor(
     protected abstract fun addInfoToHeaders(
         headersInternal: HeadersInternal,
         request: Request,
+        bodyHash: String,
         date: Date
     ): HeadersInternal
 
@@ -141,7 +141,7 @@ abstract class AwsInterceptor(
     }
 
     protected data class HeadersInternal(
-        val plainHeaders: MutableList<Pair<String, String>>,
-        val xAmzHeaders: MutableList<Pair<String, String>>
+        val plainHeaders: List<Pair<String, String>>,
+        val xAmzHeaders: List<Pair<String, String>>
     )
 }

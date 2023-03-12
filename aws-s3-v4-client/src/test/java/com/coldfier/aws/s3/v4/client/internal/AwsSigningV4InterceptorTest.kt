@@ -1,16 +1,10 @@
 package com.coldfier.aws.s3.v4.client.internal
 
 import com.coldfier.aws.s3.core.AwsCredentials
-import com.coldfier.aws.s3.core.AwsHeader
-import com.coldfier.aws.s3.internal.AwsConstants
-import com.coldfier.aws.s3.internal.AwsCredentialsStore
-import com.coldfier.aws.s3.internal.SignInfo
-import com.coldfier.aws.s3.internal.date.toIso8601FullString
+import com.coldfier.aws.s3.internal.*
 import com.coldfier.aws.s3.internal.date.toIso8601ShortString
 import com.coldfier.aws.s3.internal.hash.Hash
 import com.coldfier.aws.s3.internal.hash.HmacHash
-import com.coldfier.aws.s3.internal.request.body.bodyBytes
-import com.coldfier.aws.s3.internal.toHexString
 import okhttp3.Headers
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -52,8 +46,6 @@ internal class AwsSigningV4InterceptorTest {
         return Hash.SHA_256.calculate(body).toHexString()
     }
 
-    /////////////////////////////////////////////////////////////////
-
     @Test
     fun testCanonicalGet() {
         val request = Request.Builder()
@@ -66,7 +58,7 @@ internal class AwsSigningV4InterceptorTest {
             )
             .build()
 
-        val canonicalRequest = getCanonicalRequestResult(request)
+        val canonicalRequest = getCanonicalRequest(request)
 
         Assert.assertEquals(
             "GET\n" +
@@ -114,7 +106,7 @@ internal class AwsSigningV4InterceptorTest {
             )
             .build()
 
-        val canonicalRequest = getCanonicalRequestResult(request)
+        val canonicalRequest = getCanonicalRequest(request)
 
         Assert.assertEquals(
             "PUT\n" +
@@ -161,7 +153,7 @@ internal class AwsSigningV4InterceptorTest {
             )
             .build()
 
-        val canonicalRequest = getCanonicalRequestResult(request)
+        val canonicalRequest = getCanonicalRequest(request)
 
         Assert.assertEquals(
             "GET\n" +
@@ -206,7 +198,7 @@ internal class AwsSigningV4InterceptorTest {
             )
             .build()
 
-        val canonicalRequest = getCanonicalRequestResult(request)
+        val canonicalRequest = getCanonicalRequest(request)
 
         Assert.assertEquals(
             "GET\n" +
@@ -272,24 +264,8 @@ internal class AwsSigningV4InterceptorTest {
         return method
     }
 
-    private fun getCanonicalRequestResult(request: Request): String {
-        val date = getGmt0Date()
-
-        val headersInternal = convertHeaders(request, date)
-
-        val signedHeaders = headersInternal.plainHeaders
-            .filter {
-                !(it.first == AwsConstants.TRUE_CONTENT_TYPE_HEADER.lowercase() && it.second.isBlank())
-            }
-            .joinToString(";") { it.first } + ";" +
-                headersInternal.canonicalHeaders.joinToString(";") { it.first }
-
-        val result = getCanonicalRequestMethod().invoke(mock, request, headersInternal, signedHeaders) as String
-        return result
-    }
-
-    private fun getCanonicalRequestMethod(): Method {
-        val method = AwsSigningV4Interceptor::class.java.getDeclaredMethod(
+    private fun getCanonicalRequest(request: Request): String {
+        val method = mock.javaClass.getDeclaredMethod(
             "getCanonicalRequest",
             Request::class.java,
             SignInfo::class.java,
@@ -297,53 +273,38 @@ internal class AwsSigningV4InterceptorTest {
         )
         method.isAccessible = true
 
-        return method
+        val signInfo = getSignInfo(request, getGmt0Date())
+        val signedHeaders = getSignedHeaders(signInfo)
+
+        return method.invoke(mock, request, signInfo, signedHeaders) as String
     }
 
-    private fun convertHeaders(request: Request, date: Date): SignInfo {
-        val plainHeaders = mutableListOf<Pair<String, String>>()
-        val xAmzHeaders = mutableListOf<Pair<String, String>>()
-
-        var contentTypeHeader = Pair(AwsConstants.TRUE_CONTENT_TYPE_HEADER.lowercase(), "")
-
-        val headers = request.headers
-        headers.forEach { (key, value) ->
-            when {
-                key.contains(AwsHeader.CONTENT_TYPE) ->
-                    contentTypeHeader = Pair(AwsConstants.TRUE_CONTENT_TYPE_HEADER.lowercase(), value)
-
-                key.contains(AwsConstants.X_AMZ_KEY_START) ->
-                    xAmzHeaders.add(key.lowercase() to value)
-
-                else -> plainHeaders.add(key.lowercase() to value)
-            }
-        }
-
-        plainHeaders.add(contentTypeHeader)
-        plainHeaders.add("host" to request.url.toUrl().host)
-
-        val shaHeader = sha256Hash(request.bodyBytes())
-        xAmzHeaders.add("x-amz-content-sha256" to shaHeader)
-
-        xAmzHeaders.add("x-amz-date" to getXamzDate(date))
-
-        val sortedPlainHeaders = plainHeaders.sortedBy { it.first }
-        val sortedCanonicalHeaders = xAmzHeaders.sortedBy { it.first }
-
-        return SignInfo(
-            plainHeaders = sortedPlainHeaders,
-            canonicalHeaders = sortedCanonicalHeaders,
-            bodyHash = shaHeader
+    private fun getSignedHeaders(signInfo: SignInfo): String {
+        val method = mock.javaClass.getDeclaredMethod(
+            "getSignedHeaders",
+            SignInfo::class.java
         )
+
+        method.isAccessible = true
+
+        return method.invoke(mock, signInfo) as String
+    }
+
+    private fun getSignInfo(request: Request, date: Date): SignInfo {
+        val method = AwsInterceptor::class.java.getDeclaredMethod(
+            "getSignInfo",
+            Request::class.java,
+            Date::class.java
+        )
+
+        method.isAccessible = true
+
+        return method.invoke(mock, request, date) as SignInfo
     }
 
     private fun getGmt0Date(): Date {
         val sdf = SimpleDateFormat("yyyyMMdd'T'HHmmss'Z'")
         return sdf.parse("20130524T000000Z")!!
-    }
-
-    private fun getXamzDate(date: Date): String {
-        return date.toIso8601FullString()
     }
 
     private fun getScopeDate(date: Date): String {

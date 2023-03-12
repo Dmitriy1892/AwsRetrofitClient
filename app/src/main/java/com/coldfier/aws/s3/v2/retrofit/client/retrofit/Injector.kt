@@ -15,7 +15,7 @@ object Injector {
 
     private fun provideRetrofit(
         okHttpClient: OkHttpClient = provideOkHttpClient(),
-        baseUrl: String = "https://sample-s3-aws.com"
+        baseUrl: String = "https://sample-s3.com"
     ): Retrofit {
         val gson = GsonBuilder()
             .disableHtmlEscaping()
