@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace 'com.coldfier.aws.s3.v2.retrofit.client'
+    namespace 'com.coldfier.aws.retrofit.client'
     compileSdk 33
 
     defaultConfig {
-        applicationId 'com.coldfier.aws.s3.v2.retrofit.client'
+        applicationId 'com.coldfier.aws.retrofit.client'
         minSdk 23
         targetSdk 33
         versionCode 1
@@ -36,16 +36,12 @@ android {
 
 dependencies {
 
-    implementation project(path: ':aws-s3-v2-client')
-    implementation project(path: ':aws-s3-v4-client')
+   implementation project(':aws-retrofit-client')
 
     implementation 'androidx.core:core-ktx:1.7.0'
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.8.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
-    testImplementation 'junit:junit:4.13.2'
-    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
 
     implementation 'androidx.fragment:fragment-ktx:1.4.1'
     implementation 'androidx.lifecycle:lifecycle-extensions:2.2.0'
@@ -58,7 +54,16 @@ dependencies {
     implementation "com.squareup.okhttp3:okhttp"
     implementation "com.squareup.okhttp3:logging-interceptor"
 
+    implementation('com.squareup.retrofit2:converter-simplexml:2.9.0') {
+        exclude module: 'stax'
+        exclude module: 'stax-api'
+        exclude module: 'xpp3'
+    }
+
     implementation 'com.google.code.gson:gson:2.10.1'
     implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
 
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
 }

@@ -5,6 +5,7 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
+
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
@@ -12,9 +13,8 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "AwsS3V2RetrofitClient"
+
+rootProject.name = "AwsRetrofitClient"
+
 include ':app'
-include ':aws-s3-v2-client'
-include ':aws-s3-v4-client'
-include ':aws-s3-core'
-include ':aws-s3-internal'
+include ':aws-retrofit-client'
