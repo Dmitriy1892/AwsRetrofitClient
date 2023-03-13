@@ -14,7 +14,7 @@ object Injector {
 
     private fun provideRetrofit(
         okHttpClient: OkHttpClient = provideOkHttpClient(),
-        baseUrl: String = "https://sample-aws-s3-host.com"
+        baseUrl: String = "https://apigw-qa-tq-qdv.vebtech.dev"
     ): Retrofit {
 
         val xmlConverterFactory = SimpleXmlConverterFactory.create()

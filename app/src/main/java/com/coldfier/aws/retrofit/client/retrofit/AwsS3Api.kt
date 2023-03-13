@@ -1,7 +1,9 @@
 package com.coldfier.aws.retrofit.client.retrofit
 
 import com.coldfier.aws.retrofit.client.AwsHeader
+import com.coldfier.aws.retrofit.client.multipart.models.response.UploadInfoResponse
 import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.*
@@ -53,11 +55,20 @@ interface AwsS3Api {
         @Path("object") obj: String = "testObjNew",
     ): Response<ResponseBody>
 
+    // Step 1 for multipart upload - receiving UploadInfo with UploadId
     @POST("$S3_PATH/{bucket}/{object}?uploads")
-    suspend fun requestMultipartUpload(
-        @Header(AwsHeader.CONTENT_TYPE) contentType: String = "binary/octet-stream",
-        @Path("bucket") bucket: String = "test",
-        @Path("object") obj: String = "newMultipartObj",
-        @Body body: RequestBody
-    ): Response<Any>
+    suspend fun requestMultipartUploadInfo(
+        @Path("bucket") bucket: String,
+        @Path("object") objectNameWithExtension: String,
+        @Body body: RequestBody = byteArrayOf().toRequestBody()
+    ): UploadInfoResponse
+
+    @PUT("$S3_PATH/{bucket}/{object}")
+    suspend fun uploadMultipartChunk(
+        @Header("Content-Length") contentLength: Long,
+        @Path("bucket") bucket: String,
+        @Path("object") objectNameWithExtension: String,
+        @Query("partNumber") partNumber: Int,
+        @Query("uploadId") uploadId: String
+    )
 }
