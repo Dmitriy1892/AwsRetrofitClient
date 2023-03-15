@@ -1,9 +1,9 @@
 package com.coldfier.aws.retrofit.client.retrofit
 
 import com.coldfier.aws.retrofit.client.AwsHeader
+import com.coldfier.aws.retrofit.client.multipart.models.request.CompleteMultipartUploadRequest
 import com.coldfier.aws.retrofit.client.multipart.models.response.UploadInfoResponse
 import okhttp3.RequestBody
-import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.*
@@ -12,6 +12,7 @@ interface AwsS3Api {
 
     companion object {
         const val S3_PATH = "/s3"
+//        const val S3_PATH = ""
     }
 
     @POST("$S3_PATH/{bucket}/{object}")
@@ -59,16 +60,28 @@ interface AwsS3Api {
     @POST("$S3_PATH/{bucket}/{object}?uploads")
     suspend fun requestMultipartUploadInfo(
         @Path("bucket") bucket: String,
-        @Path("object") objectNameWithExtension: String,
-        @Body body: RequestBody = byteArrayOf().toRequestBody()
+        @Path("object") objectNameWithExtension: String
     ): UploadInfoResponse
 
+    // Step 2 for multipart upload - sending
     @PUT("$S3_PATH/{bucket}/{object}")
     suspend fun uploadMultipartChunk(
+        @Header(AwsHeader.CONTENT_TYPE) contentType: String,
         @Header("Content-Length") contentLength: Long,
         @Path("bucket") bucket: String,
-        @Path("object") objectNameWithExtension: String,
+        @Path("object", encoded = true) objectNameWithExtension: String,
         @Query("partNumber") partNumber: Int,
-        @Query("uploadId") uploadId: String
+        @Query("uploadId", encoded = true) uploadId: String,
+        @Body requestBody: RequestBody
+    ): Response<Unit>
+
+    // Step 3 for multipart upload - finish upload
+    @POST("$S3_PATH/{bucket}/{object}")
+    suspend fun completeMultipartUpload(
+        @Header(AwsHeader.CONTENT_TYPE) contentType: String,
+        @Path("bucket") bucket: String,
+        @Path("object", encoded = true) objectNameWithExtension: String,
+        @Query("uploadId", encoded = true)uploadId: String,
+        @Body request: CompleteMultipartUploadRequest
     )
 }

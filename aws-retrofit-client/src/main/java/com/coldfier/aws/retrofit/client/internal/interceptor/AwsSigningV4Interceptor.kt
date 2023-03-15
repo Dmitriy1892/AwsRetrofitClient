@@ -1,14 +1,18 @@
 package com.coldfier.aws.retrofit.client.internal.interceptor
 
-import com.coldfier.aws.retrofit.client.internal.*
+import com.coldfier.aws.retrofit.client.internal.AwsConstants
+import com.coldfier.aws.retrofit.client.internal.AwsCredentialsStore
+import com.coldfier.aws.retrofit.client.internal.body.bodyBytes
 import com.coldfier.aws.retrofit.client.internal.date.toIso8601FullString
 import com.coldfier.aws.retrofit.client.internal.date.toIso8601ShortString
 import com.coldfier.aws.retrofit.client.internal.hash.Hash
 import com.coldfier.aws.retrofit.client.internal.hash.HmacHash
+import com.coldfier.aws.retrofit.client.internal.toHexString
 import okhttp3.Request
 import java.io.UnsupportedEncodingException
 import java.net.URLEncoder
 import java.util.*
+import java.util.regex.Matcher
 import java.util.regex.Pattern
 
 internal class AwsSigningV4Interceptor(
@@ -27,6 +31,8 @@ internal class AwsSigningV4Interceptor(
         bodyHash: String,
         date: Date
     ): HeadersInternal {
+        val body = request.bodyBytes().size
+
         val xAmzHeaders = headersInternal.xAmzHeaders.toMutableList().apply {
             add(AwsConstants.X_AMZ_CONTENT_SHA256_HEADER to bodyHash)
             add(AwsConstants.X_AMZ_DATE_HEADER to date.toIso8601FullString())
@@ -67,10 +73,10 @@ internal class AwsSigningV4Interceptor(
     ): String {
         val url = request.url.toUrl()
 
-        val canonicalUri = urlEncode(
-            url.path.replace(endpointPrefix, "").substringBefore("?"),
-            true
-        )
+        val canonicalUri = url.path.replace(endpointPrefix, "").substringBeforeLast("?")
+        val encodedCanonicalUri = if (canonicalUri.isBlank()) "/" else urlEncode(canonicalUri, true)
+        val outCanonicalUri = if (encodedCanonicalUri.startsWith("/")) encodedCanonicalUri else "/$encodedCanonicalUri"
+
 
         val canonicalQueryString = convertQueryStringToCanonical(url.query ?: "")
 
@@ -80,12 +86,54 @@ internal class AwsSigningV4Interceptor(
 
         return StringBuilder()
             .appendLine(request.method)
-            .appendLine(canonicalUri)
+            .appendLine(outCanonicalUri)
             .appendLine(canonicalQueryString)
             .appendLine(canonicalHeaders)
             .appendLine(signedHeaders)
             .append(hashedPayloads)
             .toString()
+    }
+
+    fun urlEncode(value: String?, path: Boolean): String {
+        return if (value == null) {
+            ""
+        } else try {
+            val encoded: String = URLEncoder.encode(value, "UTF-8")
+
+            val pattern = java.lang.StringBuilder()
+
+            pattern
+                .append(Pattern.quote("+"))
+                .append("|")
+                .append(Pattern.quote("*"))
+                .append("|")
+                .append(Pattern.quote("%7E"))
+                .append("|")
+                .append(Pattern.quote("%2F"))
+
+            val ENCODED_CHARACTERS_PATTERN = Pattern.compile(pattern.toString())
+
+            val matcher: Matcher = ENCODED_CHARACTERS_PATTERN.matcher(encoded)
+
+            val buffer = StringBuffer(encoded.length)
+            while (matcher.find()) {
+                var replacement = matcher.group(0)
+                if ("+" == replacement) {
+                    replacement = "%20"
+                } else if ("*" == replacement) {
+                    replacement = "%2A"
+                } else if ("%7E" == replacement) {
+                    replacement = "~"
+                } else if (path && "%2F" == replacement) {
+                    replacement = "/"
+                }
+                matcher.appendReplacement(buffer, replacement)
+            }
+            matcher.appendTail(buffer)
+            buffer.toString()
+        } catch (ex: UnsupportedEncodingException) {
+            throw RuntimeException(ex)
+        }
     }
 
     private fun getStringToSign(date: Date, canonicalRequest: String): String {
@@ -109,45 +157,6 @@ internal class AwsSigningV4Interceptor(
             .toString()
     }
 
-    private fun urlEncode(value: String?, path: Boolean): String {
-        return if (value == null) {
-            ""
-        } else try {
-            val encoded = URLEncoder.encode(value, "UTF-8")
-            val encodedCharsPattern = Pattern.compile(
-                StringBuilder()
-                    .append(Pattern.quote("+"))
-                    .append("|")
-                    .append(Pattern.quote("*"))
-                    .append("|")
-                    .append(Pattern.quote("%7E"))
-                    .append("|")
-                    .append(Pattern.quote("%2F"))
-                    .toString()
-            )
-
-            val matcher = encodedCharsPattern.matcher(encoded)
-            val buffer = StringBuffer(encoded.length)
-            while (matcher.find()) {
-                var replacement = matcher.group(0) ?: ""
-
-                replacement = when {
-                    replacement == "+" -> "%20"
-                    replacement == "*" -> "%2A"
-                    replacement == "%7E" -> "~"
-                    replacement == "%2F" && path -> "/"
-                    else -> replacement
-                }
-
-                matcher.appendReplacement(buffer, replacement)
-            }
-            matcher.appendTail(buffer)
-            buffer.toString()
-        } catch (ex: UnsupportedEncodingException) {
-            throw RuntimeException(ex)
-        }
-    }
-
     private fun convertQueryStringToCanonical(queryString: String): String =
         if (queryString.isBlank()) queryString
         else queryString
@@ -156,39 +165,49 @@ internal class AwsSigningV4Interceptor(
                 val keyValueList = keyValue.split("=")
                 Pair(keyValueList[0], keyValueList.getOrNull(1) ?: "")
             }
+            .map { (key, value) ->
+                val encodedKey = urlEncode(key, false)
+                val encodedValue = urlEncode(value, false)
+
+                Pair(encodedKey, encodedValue)
+            }
             .sortedBy { it.first }
             .joinToString("&") { "${it.first}=${it.second}" }
 
     private fun getCanonicalHeaders(
         signInfo: SignInfo
     ): String {
-        val canonicalBuilder = StringBuilder()
-
         val canonicalHeaderBuilder = StringBuilder()
 
         val canonicalHeaders = mutableListOf<Pair<String, String>>().apply {
-            val plainHeaders = signInfo.plainHeaders.filter {
-                !(it.first == AwsConstants.TRUE_CONTENT_TYPE_HEADER && it.second.isBlank())
-            }
+            val plainHeaders = signInfo.plainHeaders
+                .filter { isNeedToSign(it.first) }
+
             addAll(plainHeaders)
             addAll(signInfo.canonicalHeaders)
         }
 
         canonicalHeaders.forEachIndexed { index, (key, value) ->
-            val out = "${key.lowercase()}:${value}"
+            val canonicalKey = key.replace("\\s+".toRegex(), " ").lowercase()
+            val canonicalValue = value.replace("\\s+".toRegex(), " ")
+            val out = "$canonicalKey:$canonicalValue"
             canonicalHeaderBuilder.append(out)
 
-            val isNotLastIndex = index != canonicalHeaders.lastIndex
-            if (isNotLastIndex) canonicalHeaderBuilder.appendLine()
+            canonicalHeaderBuilder.appendLine()
         }
 
-        return canonicalBuilder
-            .appendLine(canonicalHeaderBuilder.toString())
-            .toString()
+        return canonicalHeaderBuilder.toString()
+    }
+
+    private fun isNeedToSign(header: String): Boolean {
+        return AwsConstants.DATE_HEADER.equals(header, ignoreCase = true)
+                || AwsConstants.CONTENT_MD5_HEADER.equals(header, ignoreCase = true)
+                || AwsConstants.HOST_HEADER.equals(header, ignoreCase = true)
+                || header.contains(AwsConstants.X_AMZ_KEY_START, ignoreCase = true)
     }
 
     private fun getSignedHeaders(signInfo: SignInfo): String = signInfo.plainHeaders
-        .filter { !(it.first == AwsConstants.TRUE_CONTENT_TYPE_HEADER && it.second.isBlank()) }
+        .filter { isNeedToSign(it.first) }
         .joinToString(";") { it.first.lowercase() }
         .plus(";")
         .plus(

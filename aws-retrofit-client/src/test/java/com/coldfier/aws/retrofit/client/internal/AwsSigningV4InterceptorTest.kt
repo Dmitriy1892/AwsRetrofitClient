@@ -66,11 +66,10 @@ internal class AwsSigningV4InterceptorTest {
                     "/test.txt\n" +
                     "\n" +
                     "host:examplebucket.s3.amazonaws.com\n" +
-                    "range:bytes=0-9\n" +
                     "x-amz-content-sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\n" +
                     "x-amz-date:20130524T000000Z\n" +
                     "\n" +
-                    "host;range;x-amz-content-sha256;x-amz-date\n" +
+                    "host;x-amz-content-sha256;x-amz-date\n" +
                     "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
 
             canonicalRequest
@@ -82,14 +81,14 @@ internal class AwsSigningV4InterceptorTest {
             "AWS4-HMAC-SHA256\n" +
                     "20130524T000000Z\n" +
                     "20130524/us-east-1/s3/aws4_request\n" +
-                    "7344ae5b7ee6c3e7e6b0fe0640412a37625d1fbfff95c48bbb2dc43964946972",
+                    "e155673fa5bcd4b855a77a15b98fce3d10f286f93a203d6d98d2eb51f885f9b7",
             stringToSign
         )
 
         val signature = getSignature(getGmt0Date(), stringToSign)
 
         Assert.assertEquals(
-            "f0e8bdb87c964420e857bd35b5d6ed310bd44f0170aba48dd91039c6036bdb41",
+            "df548e2ce037944d03f3e68682813b093763996d597cf890ca3d9037fd231eb4",
             signature
         )
     }

@@ -1,17 +1,17 @@
 package com.coldfier.aws.retrofit.client.multipart.models.response
 
-import org.simpleframework.xml.Element
-import org.simpleframework.xml.Root
+import com.tickaroo.tikxml.annotation.PropertyElement
+import com.tickaroo.tikxml.annotation.Xml
 
-@Root(name = "InitiateMultipartUploadResult", strict = false)
-data class UploadInfoResponse(
+@Xml(name = "InitiateMultipartUploadResult")
+data class UploadInfoResponse @JvmOverloads constructor(
 
-    @Element(name = "Bucket")
+    @PropertyElement(name = "Bucket")
     val bucket: String,
 
-    @Element(name = "Key")
+    @PropertyElement(name = "Key")
     val key: String,
 
-    @Element(name = "UploadId")
+    @PropertyElement(name = "UploadId")
     val uploadId: String
 )

@@ -3,14 +3,14 @@ package com.coldfier.aws.retrofit.client.internal.interceptor
 import com.coldfier.aws.retrofit.client.AwsHeader
 import com.coldfier.aws.retrofit.client.internal.AwsConstants
 import com.coldfier.aws.retrofit.client.internal.AwsCredentialsStore
-import com.coldfier.aws.retrofit.client.internal.date.getGmt0Date
 import com.coldfier.aws.retrofit.client.internal.body.bodyBytes
+import com.coldfier.aws.retrofit.client.internal.date.getGmt0Date
 import kotlinx.coroutines.runBlocking
 import okhttp3.Headers
 import okhttp3.Interceptor
 import okhttp3.Request
 import okhttp3.Response
-import java.util.Date
+import java.util.*
 
 internal abstract class AwsInterceptor(
     private val credentialsStore: AwsCredentialsStore

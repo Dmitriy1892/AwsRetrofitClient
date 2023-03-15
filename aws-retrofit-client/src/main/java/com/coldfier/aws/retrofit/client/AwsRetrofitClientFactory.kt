@@ -9,6 +9,7 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Converter
 import retrofit2.Retrofit
+import retrofit2.converter.scalars.ScalarsConverterFactory
 
 object AwsRetrofitClientFactory {
 
@@ -77,6 +78,7 @@ object AwsRetrofitClientFactory {
 
         return Retrofit.Builder()
             .baseUrl(baseUrl)
+            .addConverterFactory(ScalarsConverterFactory.create())
             .addConverterFactory(converterFactory)
             .client(newOkHttpClient)
             .build()

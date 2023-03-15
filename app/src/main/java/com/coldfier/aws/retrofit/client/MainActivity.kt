@@ -1,24 +1,29 @@
 package com.coldfier.aws.retrofit.client
 
 import android.Manifest
+import android.animation.ObjectAnimator
 import android.annotation.SuppressLint
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.widget.Button
+import android.widget.ProgressBar
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.coldfier.aws.retrofit.client.multipart.MultipartUploadManager
+import com.coldfier.aws.retrofit.client.multipart.models.request.CompleteMultipartUploadRequest
 import com.coldfier.aws.retrofit.client.retrofit.Injector
-import com.google.android.material.button.MaterialButton
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.flow
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.FileNotFoundException
 
 class MainActivity : AppCompatActivity() {
+
+    private companion object {
+        const val FILE_CHUNK_SIZE = 5_242_880 //5 MB - minimum size for multipart upload
+    }
 
     private val filePickerLauncher = registerForActivityResult(
         ActivityResultContracts.OpenDocument()
@@ -75,30 +80,61 @@ class MainActivity : AppCompatActivity() {
                 if (cursor == null || cursor.count == 0) throw FileNotFoundException()
                 cursor.moveToFirst()
                 val fileName = cursor.getString(cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME))
+                    .replace("[', ]+".toRegex(), "")
                 val fileSize = cursor.getLong(cursor.getColumnIndex(OpenableColumns.SIZE))
 
                 val bucket = "test"
                 val uploadId = multipartUploadManager.requestUploadInfo(bucket, fileName).uploadId
 
+                val etags = mutableListOf<com.coldfier.aws.retrofit.client.multipart.models.request.UploadPartRequest>()
+
+                var partNumber = 1
 
                 contentResolver.openInputStream(uri).use { inputStream ->
                     checkNotNull(inputStream)
 
-                    var rangeStart = 0
-                    var rangeEnd = fileSize
+                    while (inputStream.available() > 0) {
+                        val chunkSize =
+                            if (inputStream.available() >= FILE_CHUNK_SIZE) FILE_CHUNK_SIZE
+                            else inputStream.available()
 
-                    val buffer = ByteArray(fileSize.toInt())
-                    val wroteBytes = inputStream.read(buffer)
+                        val buffer = ByteArray(chunkSize)
+                        inputStream.read(buffer)
 
-                    multipartUploadManager.uploadChunk(
-                        fileSize,
+                        // TODO - encrypt bytes here, if need
+
+                        buffer.inputStream()
+
+                        val etag = multipartUploadManager.uploadChunk(
+                            fileSize,
+                            bucket,
+                            fileName,
+                            partNumber,
+                            uploadId,
+                            buffer.toRequestBody()
+                        )
+                        etags.add(com.coldfier.aws.retrofit.client.multipart.models.request.UploadPartRequest(partNumber, etag))
+                        partNumber++
+
+                        val percent = partNumber * FILE_CHUNK_SIZE * 100 / fileSize
+
+                        withContext(Dispatchers.Main) {
+                            val progressValue = if (percent.toInt() <= 100) percent.toInt() else 100
+
+                            val progressView = findViewById<ProgressBar>(R.id.progress)
+
+                            ObjectAnimator.ofInt(progressView, "progress", progressValue)
+                                .setDuration(500)
+                                .start()
+                        }
+                    }
+
+                    multipartUploadManager.completeMultipartUpload(
                         bucket,
                         fileName,
-                        1,
                         uploadId,
+                        CompleteMultipartUploadRequest(etags)
                     )
-
-                    val point = 1
                 }
             }
     }
