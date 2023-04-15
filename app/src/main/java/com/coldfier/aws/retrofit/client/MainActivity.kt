@@ -15,6 +15,7 @@ import androidx.lifecycle.lifecycleScope
 import com.coldfier.aws.retrofit.client.multipart.MultipartUploadManager
 import com.coldfier.aws.retrofit.client.multipart.models.request.CompleteMultipartUploadRequest
 import com.coldfier.aws.retrofit.client.retrofit.Injector
+import com.coldfier.aws.retrofit.client.multipart.models.request.UploadPartRequest
 import kotlinx.coroutines.*
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.FileNotFoundException
@@ -63,9 +64,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun uploadFile(uri: String) {
-        lifecycleScope.launch(Dispatchers.IO + CoroutineExceptionHandler { coroutineContext, throwable ->
-            val point = 0
-        }) {
+        lifecycleScope.launch(Dispatchers.IO + CoroutineExceptionHandler { _, _ -> }) {
             uploadFileInternal(uri)
         }
     }
@@ -86,7 +85,7 @@ class MainActivity : AppCompatActivity() {
                 val bucket = "test"
                 val uploadId = multipartUploadManager.requestUploadInfo(bucket, fileName).uploadId
 
-                val etags = mutableListOf<com.coldfier.aws.retrofit.client.multipart.models.request.UploadPartRequest>()
+                val etags = mutableListOf<UploadPartRequest>()
 
                 var partNumber = 1
 
@@ -101,8 +100,6 @@ class MainActivity : AppCompatActivity() {
                         val buffer = ByteArray(chunkSize)
                         inputStream.read(buffer)
 
-                        // TODO - encrypt bytes here, if need
-
                         buffer.inputStream()
 
                         val etag = multipartUploadManager.uploadChunk(
@@ -113,7 +110,7 @@ class MainActivity : AppCompatActivity() {
                             uploadId,
                             buffer.toRequestBody()
                         )
-                        etags.add(com.coldfier.aws.retrofit.client.multipart.models.request.UploadPartRequest(partNumber, etag))
+                        etags.add(UploadPartRequest(partNumber, etag))
                         partNumber++
 
                         val percent = partNumber * FILE_CHUNK_SIZE * 100 / fileSize
