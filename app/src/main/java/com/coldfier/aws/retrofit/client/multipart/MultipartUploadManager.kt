@@ -17,12 +17,11 @@ class MultipartUploadManager(
     ): UploadInfoResponse = withContext(Dispatchers.IO) {
         awsS3Api.requestMultipartUploadInfo(
             bucket = bucket,
-            objectNameWithExtension = objectNameWithExtension
+            objectName = objectNameWithExtension
         )
     }
 
     suspend fun uploadChunk(
-        contentLength: Long,
         bucket: String,
         objectNameWithExtension: String,
         partNumber: Int,
@@ -30,13 +29,11 @@ class MultipartUploadManager(
         body: RequestBody
     ): String = withContext(Dispatchers.IO) {
         awsS3Api.uploadMultipartChunk(
-            "application/octet-stream",
-            contentLength,
-            bucket,
-            objectNameWithExtension,
-            partNumber,
-            uploadId,
-            body
+            bucket = bucket,
+            objectName = objectNameWithExtension,
+            partNumber = partNumber,
+            uploadId = uploadId,
+            requestBody = body
         ).headers().get("etag") ?: throw IllegalStateException("No info about uploaded part")
     }
 
@@ -47,8 +44,10 @@ class MultipartUploadManager(
         request: CompleteMultipartUploadRequest
     ) = withContext(Dispatchers.IO) {
         awsS3Api.completeMultipartUpload(
-            "text/xml",
-            bucket, objectNameWithExtension, uploadId, request
+            bucket = bucket,
+            objectName = objectNameWithExtension,
+            uploadId = uploadId,
+            request = request
         )
     }
 }

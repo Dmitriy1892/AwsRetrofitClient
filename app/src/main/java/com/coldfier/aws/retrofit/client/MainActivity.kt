@@ -103,7 +103,6 @@ class MainActivity : AppCompatActivity() {
                         buffer.inputStream()
 
                         val etag = multipartUploadManager.uploadChunk(
-                            fileSize,
                             bucket,
                             fileName,
                             partNumber,

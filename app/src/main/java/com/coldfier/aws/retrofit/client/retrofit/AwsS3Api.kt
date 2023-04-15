@@ -10,11 +10,7 @@ import retrofit2.http.*
 
 interface AwsS3Api {
 
-    companion object {
-        const val S3_PATH = ""
-    }
-
-    @POST("$S3_PATH/{bucket}/{object}")
+    @POST("{bucket}/{object}")
     suspend fun uploadFile(
         @Path("bucket") bucket: String = "2a9e8de5-30d6-4d70-ad2e-2b9b00c00cf3",
         @Path("object") obj: String = "testObj",
@@ -22,7 +18,7 @@ interface AwsS3Api {
         @Body body: RequestBody
     ): Response<Any>
 
-    @PUT("$S3_PATH/{bucket}/{object}")
+    @PUT("{bucket}/{object}")
     suspend fun uploadOneShot(
         @Header(AwsHeader.CONTENT_TYPE) contentType: String = "binary/octet-stream",
         @Path("bucket") bucket: String = "test",
@@ -30,7 +26,7 @@ interface AwsS3Api {
         @Body body: RequestBody
     ): Response<Any>
 
-    @PUT("$S3_PATH/{bucket}/{object}?append")
+    @PUT("{bucket}/{object}?append")
     suspend fun appendUpload(
         @Header(AwsHeader.CONTENT_TYPE) contentType: String = "binary/octet-stream",
         @Path("bucket") bucket: String = "test",
@@ -39,7 +35,7 @@ interface AwsS3Api {
         @Body body: RequestBody
     )
 
-    @GET("$S3_PATH/{bucket}")
+    @GET("{bucket}")
     suspend fun getBucket(
         @Header(AwsHeader.CONTENT_TYPE) contentType: String = "application/xml",
         @Header("X-Amz-Meta-Inf") a: String = "one",
@@ -47,7 +43,7 @@ interface AwsS3Api {
         @Path("bucket") bucket: String = "test",
     )
 
-    @GET("$S3_PATH/{bucket}/{object}")
+    @GET("{bucket}/{object}")
     suspend fun getObjectChunked(
         @Header(AwsHeader.CONTENT_TYPE) contentType: String = "application/json",
         @Header("range") range: String = "bytes=0-7",
@@ -56,30 +52,29 @@ interface AwsS3Api {
     ): Response<ResponseBody>
 
     // Step 1 for multipart upload - receiving UploadInfo with UploadId
-    @POST("$S3_PATH/{bucket}/{object}?uploads")
+    @POST("{bucket}/{object}?uploads")
     suspend fun requestMultipartUploadInfo(
         @Path("bucket") bucket: String,
-        @Path("object") objectNameWithExtension: String
+        @Path("object") objectName: String
     ): UploadInfoResponse
 
     // Step 2 for multipart upload - sending
-    @PUT("$S3_PATH/{bucket}/{object}")
+    @PUT("{bucket}/{object}")
     suspend fun uploadMultipartChunk(
-        @Header(AwsHeader.CONTENT_TYPE) contentType: String,
-        @Header("Content-Length") contentLength: Long,
+        @Header(AwsHeader.CONTENT_TYPE) contentType: String = "application/octet-stream",
         @Path("bucket") bucket: String,
-        @Path("object", encoded = true) objectNameWithExtension: String,
+        @Path("object", encoded = true) objectName: String,
         @Query("partNumber") partNumber: Int,
         @Query("uploadId", encoded = true) uploadId: String,
         @Body requestBody: RequestBody
     ): Response<Unit>
 
     // Step 3 for multipart upload - finish upload
-    @POST("$S3_PATH/{bucket}/{object}")
+    @POST("{bucket}/{object}")
     suspend fun completeMultipartUpload(
-        @Header(AwsHeader.CONTENT_TYPE) contentType: String,
+        @Header(AwsHeader.CONTENT_TYPE) contentType: String = "text/xml",
         @Path("bucket") bucket: String,
-        @Path("object", encoded = true) objectNameWithExtension: String,
+        @Path("object", encoded = true) objectName: String,
         @Query("uploadId", encoded = true)uploadId: String,
         @Body request: CompleteMultipartUploadRequest
     )
