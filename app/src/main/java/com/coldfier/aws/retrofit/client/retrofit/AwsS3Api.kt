@@ -11,8 +11,7 @@ import retrofit2.http.*
 interface AwsS3Api {
 
     companion object {
-        const val S3_PATH = "/s3"
-//        const val S3_PATH = ""
+        const val S3_PATH = ""
     }
 
     @POST("$S3_PATH/{bucket}/{object}")

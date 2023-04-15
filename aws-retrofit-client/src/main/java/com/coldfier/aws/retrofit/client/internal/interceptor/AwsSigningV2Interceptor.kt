@@ -1,11 +1,13 @@
 package com.coldfier.aws.retrofit.client.internal.interceptor
 
-import com.coldfier.aws.retrofit.client.internal.*
+import com.coldfier.aws.retrofit.client.internal.AwsConstants
+import com.coldfier.aws.retrofit.client.internal.AwsCredentialsStore
 import com.coldfier.aws.retrofit.client.internal.date.toRfc2822String
 import com.coldfier.aws.retrofit.client.internal.hash.Hash
 import com.coldfier.aws.retrofit.client.internal.hash.HmacHash
+import com.coldfier.aws.retrofit.client.internal.toBase64String
 import okhttp3.Request
-import java.util.*
+import java.util.Date
 
 internal class AwsSigningV2Interceptor(
     private val credentialsStore: AwsCredentialsStore,
@@ -78,8 +80,14 @@ internal class AwsSigningV2Interceptor(
         if (canonicalHeaderString.isNotBlank())
             stringToSignBuilder.appendLine(canonicalHeaderString)
 
-        val resource = request.url.toUrl().path.replace(endpointPrefix, "")
-        stringToSignBuilder.append(resource)
+        val path = request.url.toUrl().path
+        var pathForCanonical = if (endpointPrefix.isBlank()) path
+            else path.replaceBefore(endpointPrefix, "")
+                .replace(endpointPrefix, "")
+
+        pathForCanonical =
+            if (pathForCanonical.first().toString() == "/") pathForCanonical else "/$pathForCanonical"
+        stringToSignBuilder.append(pathForCanonical)
 
         return stringToSignBuilder.toString()
     }

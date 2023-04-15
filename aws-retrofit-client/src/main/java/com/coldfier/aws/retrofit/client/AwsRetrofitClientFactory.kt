@@ -1,10 +1,11 @@
 package com.coldfier.aws.retrofit.client
 
-import com.coldfier.aws.retrofit.client.internal.interceptor.AwsSigningV4Interceptor
 import com.coldfier.aws.retrofit.client.internal.AwsConstants
 import com.coldfier.aws.retrofit.client.internal.AwsCredentialsStore
 import com.coldfier.aws.retrofit.client.internal.interceptor.AwsInterceptor
 import com.coldfier.aws.retrofit.client.internal.interceptor.AwsSigningV2Interceptor
+import com.coldfier.aws.retrofit.client.internal.interceptor.AwsSigningV4Interceptor
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Converter
@@ -20,8 +21,13 @@ object AwsRetrofitClientFactory {
      * @param [baseUrl] - base url of the 'aws-s3' server
      * @sample [https://s3-example-server.com]
      *
-     * @param [endpointPrefix] - prefix of the url
-     * @sample "https://s3-example-server.com/s3/bucket-id" - in this case [endpointPrefix] is "/s3"
+     * @param [converterFactory] - XML converter factory that needed for parse responses
+     *
+     * @param [requestsLoggingLevel] - pass [HttpLoggingInterceptor.Level] if you need to logging
+     * your requests.
+     *
+     * @param [okHttpClient] - [OkHttpClient] that needed to add into AWS [Retrofit] client.
+     * Don't add a [HttpLoggingInterceptor] into [okHttpClient] - pass [requestsLoggingLevel] instead.
      *
      * @param [awsRegion] - AWS region
      * @sample "us-east-1" - added by default
@@ -31,14 +37,6 @@ object AwsRetrofitClientFactory {
      *
      * @param [awsSigning] - AWS signing version, [AwsSigning.V4] by default
      *
-     * @param [converterFactory] - XML converter factory that needed for parse responses
-     *
-     * @param [okHttpClient] - [OkHttpClient] that needed to add into AWS [Retrofit] client.
-     * Don't add a [HttpLoggingInterceptor] into [okHttpClient] - pass 'true'
-     * to the [isNeedToLoggingRequests] instead.
-     *
-     * @param [isNeedToLoggingRequests] - pass 'true' if you need to logging your requests.
-     *
      * @param [credentials] - AWS credentials that used for requests signing calculation
      * Includes an [AwsCredentials.accessKey] and [AwsCredentials.secretKey]
      *
@@ -47,16 +45,17 @@ object AwsRetrofitClientFactory {
      */
     fun create(
         baseUrl: String,
-        endpointPrefix: String = "",
+        converterFactory: Converter.Factory,
+        requestsLoggingLevel: HttpLoggingInterceptor.Level = HttpLoggingInterceptor.Level.NONE,
+        okHttpClient: OkHttpClient = getDefaultOkHttpClient(),
         awsRegion: String = AwsConstants.DEFAULT_AWS_REGION,
         awsService: String = AwsConstants.AWS_SERVICE_S3,
         awsSigning: AwsSigning = AwsSigning.V4,
-        converterFactory: Converter.Factory,
-        okHttpClient: OkHttpClient,
-        isNeedToLoggingRequests: Boolean,
         credentials: AwsCredentials,
         credentialsUpdater: () -> AwsCredentials = { credentials }
     ): Retrofit {
+        val path = baseUrl.toHttpUrl().toUrl().path
+        val endpointPrefix = if (path == "/") "" else path
         val credentialsStore = AwsCredentialsStore(credentials, credentialsUpdater)
         val awsSigningInterceptor = getAwsSigningInterceptor(
             awsSigning,
@@ -66,10 +65,8 @@ object AwsRetrofitClientFactory {
             awsService
         )
 
-        val loggingInterceptor = HttpLoggingInterceptor().apply {
-            level = if (isNeedToLoggingRequests) HttpLoggingInterceptor.Level.BODY
-                else HttpLoggingInterceptor.Level.NONE
-        }
+        val loggingInterceptor = HttpLoggingInterceptor()
+            .apply { level = requestsLoggingLevel }
 
         val newOkHttpClient = okHttpClient.newBuilder()
             .addInterceptor(awsSigningInterceptor)
@@ -96,4 +93,10 @@ object AwsRetrofitClientFactory {
         AwsSigning.V4 ->
             AwsSigningV4Interceptor(credentialsStore, endpointPrefix, awsRegion, awsService)
     }
+
+    private fun getDefaultOkHttpClient(): OkHttpClient = OkHttpClient.Builder()
+        .followRedirects(false)
+        .followSslRedirects(false)
+        .retryOnConnectionFailure(true)
+        .build()
 }

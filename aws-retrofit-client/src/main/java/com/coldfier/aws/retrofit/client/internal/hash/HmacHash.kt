@@ -15,11 +15,13 @@ internal enum class HmacHash(private val value: String) {
         InvalidKeyException::class,
         NoSuchAlgorithmException::class
     )
-    fun calculate(secretKey: ByteArray, dataToHash: ByteArray): ByteArray {
-        val secret = SecretKeySpec(secretKey, value)
-        val mac = Mac.getInstance(value)
-        mac.init(secret)
-
-        return mac.doFinal(dataToHash)
-    }
+    fun calculate(secretKey: ByteArray, dataToHash: ByteArray): ByteArray =
+        Mac.getInstance(value)
+            .apply {
+                val secret = SecretKeySpec(secretKey, value)
+                init(secret)
+            }
+            .run {
+                doFinal(dataToHash)
+            }
 }

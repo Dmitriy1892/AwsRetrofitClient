@@ -2,7 +2,6 @@ package com.coldfier.aws.retrofit.client.internal.interceptor
 
 import com.coldfier.aws.retrofit.client.internal.AwsConstants
 import com.coldfier.aws.retrofit.client.internal.AwsCredentialsStore
-import com.coldfier.aws.retrofit.client.internal.body.bodyBytes
 import com.coldfier.aws.retrofit.client.internal.date.toIso8601FullString
 import com.coldfier.aws.retrofit.client.internal.date.toIso8601ShortString
 import com.coldfier.aws.retrofit.client.internal.hash.Hash
@@ -11,7 +10,7 @@ import com.coldfier.aws.retrofit.client.internal.toHexString
 import okhttp3.Request
 import java.io.UnsupportedEncodingException
 import java.net.URLEncoder
-import java.util.*
+import java.util.Date
 import java.util.regex.Matcher
 import java.util.regex.Pattern
 
@@ -31,8 +30,6 @@ internal class AwsSigningV4Interceptor(
         bodyHash: String,
         date: Date
     ): HeadersInternal {
-        val body = request.bodyBytes().size
-
         val xAmzHeaders = headersInternal.xAmzHeaders.toMutableList().apply {
             add(AwsConstants.X_AMZ_CONTENT_SHA256_HEADER to bodyHash)
             add(AwsConstants.X_AMZ_DATE_HEADER to date.toIso8601FullString())
@@ -73,10 +70,15 @@ internal class AwsSigningV4Interceptor(
     ): String {
         val url = request.url.toUrl()
 
-        val canonicalUri = url.path.replace(endpointPrefix, "").substringBeforeLast("?")
+        var pathForCanonical = if (endpointPrefix.isBlank()) url.path
+            else url.path.replaceBefore(endpointPrefix, "").replace(endpointPrefix, "")
+
+        pathForCanonical =
+            if (pathForCanonical.first().toString() == "/") pathForCanonical else "/$pathForCanonical"
+
+        val canonicalUri = pathForCanonical.substringBeforeLast("?")
         val encodedCanonicalUri = if (canonicalUri.isBlank()) "/" else urlEncode(canonicalUri, true)
         val outCanonicalUri = if (encodedCanonicalUri.startsWith("/")) encodedCanonicalUri else "/$encodedCanonicalUri"
-
 
         val canonicalQueryString = convertQueryStringToCanonical(url.query ?: "")
 
@@ -94,7 +96,7 @@ internal class AwsSigningV4Interceptor(
             .toString()
     }
 
-    fun urlEncode(value: String?, path: Boolean): String {
+    private fun urlEncode(value: String?, path: Boolean): String {
         return if (value == null) {
             ""
         } else try {

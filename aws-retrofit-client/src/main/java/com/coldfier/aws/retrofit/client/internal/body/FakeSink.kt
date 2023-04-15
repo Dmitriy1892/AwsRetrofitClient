@@ -18,6 +18,11 @@ internal class FakeSink : BufferedSink {
     }
 
     override fun write(source: ByteArray): BufferedSink = write(source, 0, source.size)
+    @Deprecated(
+        "moved to val: use getBuffer() instead",
+        replaceWith = ReplaceWith("buffer"),
+        level = DeprecationLevel.WARNING
+    )
     override fun buffer(): Buffer = buffer
     override fun close() = Unit
     override fun emit(): BufferedSink = this

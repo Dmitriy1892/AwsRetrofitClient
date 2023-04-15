@@ -1,6 +1,7 @@
 package com.coldfier.aws.retrofit.client.internal.date
 
-import java.util.*
+import java.util.Calendar
+import java.util.Date
 
 /**
  * Function for current date in GMT-0 time zone receiving
